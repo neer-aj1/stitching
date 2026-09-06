@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { DragEvent, ReactNode } from 'react'
+import type { PointerEvent, ReactNode } from 'react'
 import html2canvas from 'html2canvas'
 import { Button } from './Button'
 import { contactEmail } from '../data/site'
@@ -28,6 +28,8 @@ interface PlacedDeco {
   x: number
   y: number
 }
+
+type DragSource = { kind: 'palette'; type: DecorId } | { kind: 'move'; decoId: number; type: DecorId }
 
 /* ============================ DATA ============================ */
 
@@ -244,10 +246,12 @@ export function CustomDesigner() {
   const [size, setSize] = useState<SizeId>('medium')
   const [decorations, setDecorations] = useState<PlacedDeco[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
+  const [drag, setDrag] = useState<{ source: DragSource; x: number; y: number } | null>(null)
 
   const fabricRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
-  const dragCounter = useRef(0)
+  const dragCandidate = useRef<{ pointerId: number; startX: number; startY: number; source: DragSource } | null>(null)
+  const suppressClickRef = useRef(false)
 
   const threadColor = useMemo(() => threadOptions[thread]?.hex ?? '#b4552f', [thread])
   const fabricColor = useMemo(() => fabricOptions[fabric]?.hex ?? '#efe6d7', [fabric])
@@ -282,54 +286,75 @@ export function CustomDesigner() {
   const addDeco = (type: DecorId, x: number, y: number) =>
     setDecorations((prev) => [...prev, { id: Date.now(), type, x, y }])
 
-  const onPaletteDragStart = (e: DragEvent<HTMLButtonElement>, type: DecorId) => {
-    e.dataTransfer.setData('application/x-threadwork-deco', type)
-    e.dataTransfer.setData('application/x-threadwork-move', '')
-    e.dataTransfer.effectAllowed = 'copy'
-  }
-
-  const onPlacedDragStart = (e: DragEvent<HTMLDivElement>, deco: PlacedDeco) => {
-    e.dataTransfer.setData('application/x-threadwork-move', String(deco.id))
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const onFabricDragEnter = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    dragCounter.current += 1
-    setIsDragOver(true)
-  }
-
-  const onFabricDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-threadwork-move')
-      ? 'move'
-      : 'copy'
-  }
-
-  const onFabricDragLeave = () => {
-    dragCounter.current -= 1
-    if (dragCounter.current <= 0) {
-      dragCounter.current = 0
-      setIsDragOver(false)
-    }
-  }
-
-  const onFabricDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    dragCounter.current = 0
-    setIsDragOver(false)
+  const posInFabric = (clientX: number, clientY: number) => {
     const el = fabricRef.current
-    if (!el) return
+    if (!el) return false
     const rect = el.getBoundingClientRect()
-    const x = Math.min(90, Math.max(10, Math.round(((e.clientX - rect.left) / rect.width) * 100)))
-    const y = Math.min(90, Math.max(10, Math.round(((e.clientY - rect.top) / rect.height) * 100)))
-    const moveId = e.dataTransfer.getData('application/x-threadwork-move')
-    if (moveId) {
-      setDecorations((prev) => prev.map((d) => (d.id === Number(moveId) ? { ...d, x, y } : d)))
-      return
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+  }
+
+  const toFabricPercent = (clientX: number, clientY: number) => {
+    const el = fabricRef.current
+    if (!el) return { x: 50, y: 50 }
+    const rect = el.getBoundingClientRect()
+    return {
+      x: Math.min(90, Math.max(10, Math.round(((clientX - rect.left) / rect.width) * 100))),
+      y: Math.min(90, Math.max(10, Math.round(((clientY - rect.top) / rect.height) * 100))),
     }
-    const type = e.dataTransfer.getData('application/x-threadwork-deco') as DecorId
-    if (type in decorPaths) addDeco(type, x, y)
+  }
+
+  const onPalettePointerDown = (e: PointerEvent<HTMLButtonElement>, type: DecorId) => {
+    dragCandidate.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, source: { kind: 'palette', type } }
+  }
+
+  const onDecoPointerDown = (e: PointerEvent<HTMLDivElement>, deco: PlacedDeco) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    dragCandidate.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      source: { kind: 'move', decoId: deco.id, type: deco.type },
+    }
+  }
+
+  const onDragPointerMove = (e: PointerEvent<HTMLButtonElement | HTMLDivElement>) => {
+    const cand = dragCandidate.current
+    if (!cand || cand.pointerId !== e.pointerId) return
+    if (!drag) {
+      const dist = Math.hypot(e.clientX - cand.startX, e.clientY - cand.startY)
+      if (dist < 6) return
+      e.preventDefault()
+      e.currentTarget.setPointerCapture(e.pointerId)
+      suppressClickRef.current = true
+    }
+    setDrag({ source: cand.source, x: e.clientX, y: e.clientY })
+    setIsDragOver(posInFabric(e.clientX, e.clientY))
+  }
+
+  const onDragPointerUp = (e: PointerEvent<HTMLButtonElement | HTMLDivElement>) => {
+    dragCandidate.current = null
+    if (drag) {
+      suppressClickRef.current = true
+      if (posInFabric(e.clientX, e.clientY)) {
+        const { x, y } = toFabricPercent(e.clientX, e.clientY)
+        const source = drag.source
+        if (source.kind === 'palette') {
+          addDeco(source.type, x, y)
+        } else {
+          setDecorations((prev) =>
+            prev.map((d) => (d.id === source.decoId ? { ...d, x, y } : d)),
+          )
+        }
+      }
+      setDrag(null)
+    }
+    setIsDragOver(false)
+  }
+
+  const onDragCancel = () => {
+    dragCandidate.current = null
+    setDrag(null)
+    setIsDragOver(false)
   }
 
   const removeDeco = (id: number) => setDecorations((prev) => prev.filter((d) => d.id !== id))
@@ -428,10 +453,6 @@ export function CustomDesigner() {
             {/* Fabric */}
             <div
               ref={fabricRef}
-              onDragEnter={onFabricDragEnter}
-              onDragOver={onFabricDragOver}
-              onDragLeave={onFabricDragLeave}
-              onDrop={onFabricDrop}
               className="absolute inset-[11px] overflow-hidden rounded-full transition-colors duration-500"
               style={{ backgroundColor: fabricColor }}
             >
@@ -479,21 +500,21 @@ export function CustomDesigner() {
                 return (
                   <div
                     key={deco.id}
-                    draggable
-                    onDragStart={(e) => onPlacedDragStart(e, deco)}
-                    className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing"
+                    onPointerDown={(e) => onDecoPointerDown(e, deco)}
+                    onPointerMove={onDragPointerMove}
+                    onPointerUp={onDragPointerUp}
+                    onPointerCancel={onDragCancel}
+                    className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none select-none active:cursor-grabbing"
                     style={{ left: `${deco.x}%`, top: `${deco.y}%` }}
                   >
-                    <div
-                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/60 ring-1 ring-black/[0.08] backdrop-blur-[2px] transition-shadow group-hover:ring-terracotta/60"
-                    >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/60 ring-1 ring-black/[0.08] backdrop-blur-[2px] transition-shadow group-hover:ring-terracotta/60">
                       <DecorGlyph id={deco.type} className="h-6 w-6" strokeWidth={1.8} />
                     </div>
                     <button
                       type="button"
                       onClick={() => removeDeco(deco.id)}
                       aria-label={`Remove ${label}`}
-                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-charcoal text-[10px] leading-none text-ivory shadow opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-charcoal text-[10px] leading-none text-ivory shadow"
                     >
                       ×
                     </button>
@@ -542,11 +563,19 @@ export function CustomDesigner() {
                 <button
                   key={opt.id}
                   type="button"
-                  draggable
-                  onDragStart={(e) => onPaletteDragStart(e, opt.id)}
-                  onClick={() => addDeco(opt.id, 74, 82)}
+                  onPointerDown={(e) => onPalettePointerDown(e, opt.id)}
+                  onPointerMove={onDragPointerMove}
+                  onPointerUp={onDragPointerUp}
+                  onPointerCancel={onDragCancel}
+                  onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false
+                      return
+                    }
+                    addDeco(opt.id, 74, 82)
+                  }}
                   title="Drag onto the hoop, or click to add"
-                  className="flex items-center gap-1.5 rounded-full border border-beige-deep/60 bg-white/50 px-3 py-1.5 text-xs text-charcoal transition-all hover:border-terracotta hover:text-terracotta active:scale-95"
+                  className="flex touch-none select-none items-center gap-1.5 rounded-full border border-beige-deep/60 bg-white/50 px-3 py-1.5 text-xs text-charcoal transition-all hover:border-terracotta hover:text-terracotta active:scale-95"
                 >
                   <DecorGlyph id={opt.id} className="h-4 w-4" />
                   {opt.label}
@@ -619,6 +648,19 @@ export function CustomDesigner() {
           Opens your email with all your choices filled in — attach the downloaded preview image so we can match it exactly. No sign-up needed.
         </p>
       </div>
+
+      {/* Drag ghost */}
+      {drag && (
+        <div
+          className="pointer-events-none fixed left-0 top-0 z-50 -translate-x-1/2 -translate-y-1/2"
+          style={{ left: drag.x, top: drag.y }}
+          aria-hidden="true"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10">
+            <DecorGlyph id={drag.source.type} className="h-7 w-7" strokeWidth={1.8} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
