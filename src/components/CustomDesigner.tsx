@@ -431,7 +431,7 @@ export function CustomDesigner() {
         <button
           type="button"
           onClick={surprise}
-          className="text-xs text-charcoal-soft underline-offset-4 transition-colors hover:text-terracotta hover:underline"
+          className="-m-2 rounded-full px-2 py-2 text-xs text-charcoal-soft underline-offset-4 transition-colors hover:text-terracotta hover:underline"
         >
           Surprise me
         </button>
@@ -532,6 +532,45 @@ export function CustomDesigner() {
 
         {/* Controls */}
         <div className="flex flex-col gap-5">
+          <Field label="Decorations">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {decorOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onPointerDown={(e) => onPalettePointerDown(e, opt.id)}
+                  onPointerMove={onDragPointerMove}
+                  onPointerUp={onDragPointerUp}
+                  onPointerCancel={onDragCancel}
+                  onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false
+                      return
+                    }
+                    addDeco(opt.id, 74, 82)
+                  }}
+                  title="Drag onto the hoop, or tap to add"
+                  className="flex min-h-10 touch-none select-none items-center gap-1.5 rounded-full border border-beige-deep/60 bg-white/50 px-4 py-2 text-xs text-charcoal transition-all hover:border-terracotta hover:text-terracotta active:scale-95"
+                >
+                  <DecorGlyph id={opt.id} className="h-4 w-4" />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-charcoal-soft">
+              Drag into the hoop above to place, or tap to add. Drag placed accents to reposition.
+            </p>
+            {decorations.length > 0 && (
+              <button
+                type="button"
+                onClick={clearDecos}
+                className="mt-2 text-xs text-charcoal-soft underline-offset-4 transition-colors hover:text-terracotta hover:underline"
+              >
+                Clear {decorations.length} decoration{decorations.length === 1 ? '' : 's'}
+              </button>
+            )}
+          </Field>
+
           <Field label="Your initials or name">
             <div className="flex items-center gap-2">
               <input
@@ -556,45 +595,6 @@ export function CustomDesigner() {
 
           <Field label="Stitch density">
             <SegmentGroup options={densityOptions} value={density} onChange={setDensity} />
-          </Field>
-
-          <Field label="Decorations">
-            <div className="flex flex-wrap items-center gap-2">
-              {decorOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onPointerDown={(e) => onPalettePointerDown(e, opt.id)}
-                  onPointerMove={onDragPointerMove}
-                  onPointerUp={onDragPointerUp}
-                  onPointerCancel={onDragCancel}
-                  onClick={() => {
-                    if (suppressClickRef.current) {
-                      suppressClickRef.current = false
-                      return
-                    }
-                    addDeco(opt.id, 74, 82)
-                  }}
-                  title="Drag onto the hoop, or click to add"
-                  className="flex touch-none select-none items-center gap-1.5 rounded-full border border-beige-deep/60 bg-white/50 px-3 py-1.5 text-xs text-charcoal transition-all hover:border-terracotta hover:text-terracotta active:scale-95"
-                >
-                  <DecorGlyph id={opt.id} className="h-4 w-4" />
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-[11px] text-charcoal-soft">
-              Drag onto the hoop to place, or click to add. Drag placed accents to reposition.
-            </p>
-            {decorations.length > 0 && (
-              <button
-                type="button"
-                onClick={clearDecos}
-                className="mt-2 text-xs text-charcoal-soft underline-offset-4 transition-colors hover:text-terracotta hover:underline"
-              >
-                Clear {decorations.length} decoration{decorations.length === 1 ? '' : 's'}
-              </button>
-            )}
           </Field>
 
           <Field label="Hoop size">
