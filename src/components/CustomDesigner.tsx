@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { DragEvent, ReactNode } from 'react'
+import html2canvas from 'html2canvas'
 import { Button } from './Button'
 import { contactEmail } from '../data/site'
 
@@ -245,6 +246,7 @@ export function CustomDesigner() {
   const [isDragOver, setIsDragOver] = useState(false)
 
   const fabricRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const dragCounter = useRef(0)
 
   const threadColor = useMemo(() => threadOptions[thread]?.hex ?? '#b4552f', [thread])
@@ -334,6 +336,28 @@ export function CustomDesigner() {
 
   const clearDecos = () => setDecorations([])
 
+  const [isCapturing, setIsCapturing] = useState(false)
+
+  const capturePreview = async () => {
+    const el = previewRef.current
+    if (!el || isCapturing) return
+    setIsCapturing(true)
+    try {
+      const canvas = await html2canvas(el, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      })
+      const link = document.createElement('a')
+      link.download = 'threadwork-preview.png'
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setIsCapturing(false)
+    }
+  }
+
   const surprise = () => {
     setInitials(initialSuggestions[Math.floor(Math.random() * initialSuggestions.length)].toUpperCase())
     setFont(fontOptions[Math.floor(Math.random() * fontOptions.length)].value)
@@ -391,6 +415,7 @@ export function CustomDesigner() {
         {/* Preview */}
         <div className="flex flex-col items-center">
           <div
+            ref={previewRef}
             className="relative aspect-square w-full max-w-[280px]"
             role="img"
             aria-label={`Preview of ${initials || 'your initial'}, ${threadOptions[thread]?.name} thread on ${fabricOptions[fabric]?.name}`}
@@ -561,14 +586,38 @@ export function CustomDesigner() {
           ))}
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Button href={requestHref} size="lg" className="sm:flex-1">
             Request this piece
           </Button>
-          <p className="text-xs font-light leading-relaxed text-charcoal-soft sm:max-w-[16rem]">
-            Opens your email with all your choices filled in — no sign-up needed.
-          </p>
+          <Button
+            type="button"
+            onClick={capturePreview}
+            disabled={isCapturing}
+            variant="outline"
+            size="lg"
+            className="sm:flex-1"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v12" />
+              <path d="m7 10 5 5 5-5" />
+              <path d="M5 21h14" />
+            </svg>
+            {isCapturing ? 'Capturing…' : 'Download preview'}
+          </Button>
         </div>
+        <p className="mt-3 max-w-xl text-center text-xs font-light leading-relaxed text-charcoal-soft sm:mx-auto">
+          Opens your email with all your choices filled in — attach the downloaded preview image so we can match it exactly. No sign-up needed.
+        </p>
       </div>
     </div>
   )
