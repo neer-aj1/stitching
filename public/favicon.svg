@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- embroidery hoop -->
+  <circle cx="32" cy="32" r="24" stroke="#2b231c" stroke-width="3.5" fill="none" />
+
+  <!-- stitched cross inside the hoop -->
+  <path d="M20 20 L44 44" stroke="#b4552f" stroke-width="3" stroke-linecap="round" />
+  <path d="M44 20 L20 44" stroke="#b4552f" stroke-width="3" stroke-linecap="round" />
+
+  <!-- a trailing thread -->
+  <path d="M12 52 C24 58 40 50 52 54" stroke="#b4552f" stroke-width="2" stroke-linecap="round" fill="none" />
+</svg>
