@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import type { DragEvent, ReactNode } from 'react'
 import { Button } from './Button'
 import { contactEmail } from '../data/site'
 
@@ -17,6 +17,15 @@ interface Swatch {
 interface SegOption<T extends string> {
   value: T
   label: string
+}
+
+export type DecorId = 'flower' | 'leaf' | 'sparkle' | 'heart' | 'star' | 'butterfly'
+
+interface PlacedDeco {
+  id: number
+  type: DecorId
+  x: number
+  y: number
 }
 
 /* ============================ DATA ============================ */
@@ -64,7 +73,78 @@ const sizeSpecs: Record<SizeId, { ring: string; factor: number; px: number }> = 
 
 const initialSuggestions = ['A', 'AM', 'EL', 'RS', 'Bloom', 'Cozy', 'Stitch']
 
+/* ============================ DECORATIONS ============================ */
+
+const decorOptions: { id: DecorId; label: string }[] = [
+  { id: 'flower', label: 'Flower' },
+  { id: 'leaf', label: 'Leaf' },
+  { id: 'sparkle', label: 'Sparkle' },
+  { id: 'heart', label: 'Heart' },
+  { id: 'star', label: 'Star' },
+  { id: 'butterfly', label: 'Butterfly' },
+]
+
+const decorPaths: Record<DecorId, ReactNode> = {
+  flower: (
+    <>
+      <path d="M2 9a10 10 0 1 0 20 0" />
+      <path d="M12 19a10 10 0 0 1 10 -10" />
+      <path d="M2 9a10 10 0 0 1 10 10" />
+      <path d="M12 4a9.7 9.7 0 0 1 2.99 7.5" />
+      <path d="M9.01 11.5a9.7 9.7 0 0 1 2.99 -7.5" />
+    </>
+  ),
+  leaf: (
+    <>
+      <path d="M5 21c.5 -4.5 2.5 -8 7 -10" />
+      <path d="M7.5 15q -3.5 0 -4.5 -6a8.4 8.4 0 0 1 3.438 .402a12 12 0 0 1 -.052 -.793c0 -3.606 3.204 -5.609 3.204 -5.609s2.003 1.252 2.842 3.557q 2.568 -1.557 6.568 -1.557q .396 3.775 -1.557 6.568c2.305 .839 3.557 2.842 3.557 2.842s-3 2.59 -7 2.59c0 1 0 1 .5 3q -6 0 -7 -5" />
+    </>
+  ),
+  sparkle: (
+    <path d="M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6" />
+  ),
+  heart: (
+    <path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+  ),
+  star: (
+    <path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873l-6.158 -3.245" />
+  ),
+  butterfly: (
+    <>
+      <path d="M12 18.176a3 3 0 1 1 -4.953 -2.449l-.025 .023a4.502 4.502 0 0 1 1.483 -8.75c1.414 0 2.675 .652 3.5 1.671a4.5 4.5 0 1 1 4.983 7.079a3 3 0 1 1 -4.983 2.25l-.005 .176" />
+      <path d="M12 19v-10" />
+      <path d="M9 3l3 2l3 -2" />
+    </>
+  ),
+}
+
+const decorStitches: Record<DecorId, number> = {
+  flower: 260,
+  leaf: 200,
+  sparkle: 150,
+  heart: 170,
+  star: 180,
+  butterfly: 320,
+}
+
 /* ============================ GLYPHS ============================ */
+
+function DecorGlyph({ id, className, strokeWidth = 1.5 }: { id: DecorId; className?: string; strokeWidth?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {decorPaths[id]}
+    </svg>
+  )
+}
 
 /* ===================== SMALL FIELD COMPONENTS ===================== */
 
@@ -161,6 +241,11 @@ export function CustomDesigner() {
   const [fabric, setFabric] = useState(0)
   const [density, setDensity] = useState<Density>('medium')
   const [size, setSize] = useState<SizeId>('medium')
+  const [decorations, setDecorations] = useState<PlacedDeco[]>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const fabricRef = useRef<HTMLDivElement>(null)
+  const dragCounter = useRef(0)
 
   const threadColor = useMemo(() => threadOptions[thread]?.hex ?? '#b4552f', [thread])
   const fabricColor = useMemo(() => fabricOptions[fabric]?.hex ?? '#efe6d7', [fabric])
@@ -177,9 +262,77 @@ export function CustomDesigner() {
     const densityF = density === 'fine' ? 1.15 : density === 'medium' ? 1 : 0.85
     const sizeF = sizeSpecs[size].factor
     const base = 620 + 210 * (charCount - 1)
-    const total = base * densityF * sizeF
+    const decoStitchTotal = decorations.reduce((sum, d) => sum + (decorStitches[d.type] ?? 0), 0)
+    const total = base * densityF * sizeF + decoStitchTotal
     return Math.round(total / 10) * 10
-  }, [density, size, charCount])
+  }, [density, size, charCount, decorations])
+
+  const decoSummary = useMemo(() => {
+    const counts = new Map<DecorId, number>()
+    decorations.forEach((d) => counts.set(d.type, (counts.get(d.type) ?? 0) + 1))
+    return (
+      [...counts.entries()]
+        .map(([t, c]) => `${c} × ${decorOptions.find((o) => o.id === t)?.label}`)
+        .join(', ') || 'None'
+    )
+  }, [decorations])
+
+  const addDeco = (type: DecorId, x: number, y: number) =>
+    setDecorations((prev) => [...prev, { id: Date.now(), type, x, y }])
+
+  const onPaletteDragStart = (e: DragEvent<HTMLButtonElement>, type: DecorId) => {
+    e.dataTransfer.setData('application/x-threadwork-deco', type)
+    e.dataTransfer.setData('application/x-threadwork-move', '')
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const onPlacedDragStart = (e: DragEvent<HTMLDivElement>, deco: PlacedDeco) => {
+    e.dataTransfer.setData('application/x-threadwork-move', String(deco.id))
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const onFabricDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    dragCounter.current += 1
+    setIsDragOver(true)
+  }
+
+  const onFabricDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-threadwork-move')
+      ? 'move'
+      : 'copy'
+  }
+
+  const onFabricDragLeave = () => {
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragOver(false)
+    }
+  }
+
+  const onFabricDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    dragCounter.current = 0
+    setIsDragOver(false)
+    const el = fabricRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const x = Math.min(90, Math.max(10, Math.round(((e.clientX - rect.left) / rect.width) * 100)))
+    const y = Math.min(90, Math.max(10, Math.round(((e.clientY - rect.top) / rect.height) * 100)))
+    const moveId = e.dataTransfer.getData('application/x-threadwork-move')
+    if (moveId) {
+      setDecorations((prev) => prev.map((d) => (d.id === Number(moveId) ? { ...d, x, y } : d)))
+      return
+    }
+    const type = e.dataTransfer.getData('application/x-threadwork-deco') as DecorId
+    if (type in decorPaths) addDeco(type, x, y)
+  }
+
+  const removeDeco = (id: number) => setDecorations((prev) => prev.filter((d) => d.id !== id))
+
+  const clearDecos = () => setDecorations([])
 
   const surprise = () => {
     setInitials(initialSuggestions[Math.floor(Math.random() * initialSuggestions.length)].toUpperCase())
@@ -188,6 +341,9 @@ export function CustomDesigner() {
     setFabric(Math.floor(Math.random() * fabricOptions.length))
     setDensity(densityOptions[Math.floor(Math.random() * densityOptions.length)].value)
     setSize(sizeOptions[Math.floor(Math.random() * sizeOptions.length)].value)
+    setDecorations([
+      { id: Date.now(), type: decorOptions[Math.floor(Math.random() * decorOptions.length)].id, x: 74, y: 82 },
+    ])
   }
 
   const requestHref = useMemo(() => {
@@ -199,12 +355,13 @@ export function CustomDesigner() {
       `Thread: ${threadOptions[thread]?.name}`,
       `Fabric: ${fabricOptions[fabric]?.name}`,
       `Stitch density: ${densityOptions.find((d) => d.value === density)?.label}`,
+      `Decorations: ${decoSummary}`,
       `Hoop size: ${sizeSpecs[size].ring.replace('″ hoop', ' inch')}`,
       `Estimated stitches: ≈ ${stitchCount.toLocaleString()}`,
     ]
     const subject = 'Custom Embroidery Request'
     return `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
-  }, [initials, font, thread, fabric, density, size, stitchCount])
+  }, [initials, font, thread, fabric, density, size, stitchCount, decoSummary])
 
   const summaryChips = [
     initials || 'Initial',
@@ -212,6 +369,7 @@ export function CustomDesigner() {
     threadOptions[thread]?.name ?? '',
     fabricOptions[fabric]?.name ?? '',
     densityOptions.find((d) => d.value === density)?.label ?? '',
+    decorations.length > 0 ? `${decorations.length} decoration${decorations.length === 1 ? '' : 's'}` : null,
   ].filter(Boolean)
 
   return (
@@ -244,22 +402,38 @@ export function CustomDesigner() {
             />
             {/* Fabric */}
             <div
+              ref={fabricRef}
+              onDragEnter={onFabricDragEnter}
+              onDragOver={onFabricDragOver}
+              onDragLeave={onFabricDragLeave}
+              onDrop={onFabricDrop}
               className="absolute inset-[11px] overflow-hidden rounded-full transition-colors duration-500"
               style={{ backgroundColor: fabricColor }}
             >
               <div
-                className="absolute inset-0"
+                className="absolute inset-0 pointer-events-none"
                 style={{ background: 'radial-gradient(circle at 32% 28%, rgba(255,255,255,0.35), transparent 62%)' }}
                 aria-hidden="true"
               />
               {/* Guide stitch-circle */}
               <div
-                className="absolute left-1/2 top-1/2 aspect-square w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed transition-colors duration-500"
+                className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[74%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed transition-colors duration-500"
                 style={{ borderColor: threadColor, opacity: 0.35 }}
                 aria-hidden="true"
               />
+              {isDragOver && (
+                <div
+                  className="pointer-events-none absolute inset-0 rounded-full bg-terracotta/5 ring-2 ring-inset ring-terracotta/80"
+                  aria-hidden="true"
+                />
+              )}
+              {decorations.length === 0 && !isDragOver && (
+                <div className="pointer-events-none absolute bottom-[9%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-dashed border-charcoal/20 bg-white/30 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-charcoal-soft/80">
+                  Drag accents here
+                </div>
+              )}
               {/* Letter */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <span
                   key={`${initials}-${font}-${size}`}
                   className={`${letterFont} ${letterWeight} animate-[stitch-pop_0.45s_cubic-bezier(0.22,1,0.36,1)] leading-none`}
@@ -274,6 +448,33 @@ export function CustomDesigner() {
                   {initials || 'A'}
                 </span>
               </div>
+              {/* Placed decorations */}
+              {decorations.map((deco) => {
+                const label = decorOptions.find((o) => o.id === deco.type)?.label ?? 'decoration'
+                return (
+                  <div
+                    key={deco.id}
+                    draggable
+                    onDragStart={(e) => onPlacedDragStart(e, deco)}
+                    className="group absolute z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing"
+                    style={{ left: `${deco.x}%`, top: `${deco.y}%` }}
+                  >
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/60 ring-1 ring-black/[0.08] backdrop-blur-[2px] transition-shadow group-hover:ring-terracotta/60"
+                    >
+                      <DecorGlyph id={deco.type} className="h-6 w-6" strokeWidth={1.8} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeDeco(deco.id)}
+                      aria-label={`Remove ${label}`}
+                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-charcoal text-[10px] leading-none text-ivory shadow opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
@@ -308,6 +509,37 @@ export function CustomDesigner() {
 
           <Field label="Stitch density">
             <SegmentGroup options={densityOptions} value={density} onChange={setDensity} />
+          </Field>
+
+          <Field label="Decorations">
+            <div className="flex flex-wrap items-center gap-2">
+              {decorOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  draggable
+                  onDragStart={(e) => onPaletteDragStart(e, opt.id)}
+                  onClick={() => addDeco(opt.id, 74, 82)}
+                  title="Drag onto the hoop, or click to add"
+                  className="flex items-center gap-1.5 rounded-full border border-beige-deep/60 bg-white/50 px-3 py-1.5 text-xs text-charcoal transition-all hover:border-terracotta hover:text-terracotta active:scale-95"
+                >
+                  <DecorGlyph id={opt.id} className="h-4 w-4" />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-charcoal-soft">
+              Drag onto the hoop to place, or click to add. Drag placed accents to reposition.
+            </p>
+            {decorations.length > 0 && (
+              <button
+                type="button"
+                onClick={clearDecos}
+                className="mt-2 text-xs text-charcoal-soft underline-offset-4 transition-colors hover:text-terracotta hover:underline"
+              >
+                Clear {decorations.length} decoration{decorations.length === 1 ? '' : 's'}
+              </button>
+            )}
           </Field>
 
           <Field label="Hoop size">
