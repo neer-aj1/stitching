@@ -7,7 +7,6 @@ import { contactEmail } from '../data/site'
 
 export type FontStyle = 'script' | 'serif' | 'modern'
 export type Density = 'fine' | 'medium' | 'bold'
-export type MotifId = 'none' | 'leaf' | 'flower' | 'spark'
 export type SizeId = 'small' | 'medium' | 'large'
 
 interface Swatch {
@@ -51,13 +50,6 @@ const densityOptions: SegOption<Density>[] = [
   { value: 'bold', label: 'Bold' },
 ]
 
-const motifOptions: SegOption<MotifId>[] = [
-  { value: 'none', label: 'None' },
-  { value: 'leaf', label: 'Leaf' },
-  { value: 'flower', label: 'Flower' },
-  { value: 'spark', label: 'Spark' },
-]
-
 const sizeOptions: SegOption<SizeId>[] = [
   { value: 'small', label: 'Small' },
   { value: 'medium', label: 'Medium' },
@@ -73,44 +65,6 @@ const sizeSpecs: Record<SizeId, { ring: string; factor: number; px: number }> = 
 const initialSuggestions = ['A', 'AM', 'EL', 'RS', 'Bloom', 'Cozy', 'Stitch']
 
 /* ============================ GLYPHS ============================ */
-
-function MotifGlyph({ id, className }: { id: MotifId; className?: string }) {
-  if (id === 'none') return null
-  if (id === 'leaf')
-    return (
-      <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
-        <path
-          d="M12 2C6.5 5.8 4.5 10.4 4.5 15.5A7.5 7.5 0 0 0 19.5 15.5C19.5 12.6 17.8 8.2 12 2Z"
-          fill="currentColor"
-        />
-        <path d="M12 7v14" stroke="#f7f1e8" strokeWidth="1" opacity="0.45" />
-      </svg>
-    )
-  if (id === 'flower')
-    return (
-      <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-        {[0, 72, 144, 216, 288].map((a) => (
-          <circle
-            key={a}
-            cx="12"
-            cy="4.6"
-            r="4"
-            fill="currentColor"
-            transform={`rotate(${a} 12 12)`}
-          />
-        ))}
-        <circle cx="12" cy="12" r="2.4" fill="#f7f1e8" />
-      </svg>
-    )
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        d="M12 1.5 L14.2 9.8 L22.5 12 L14.2 14.2 L12 22.5 L9.8 14.2 L1.5 12 L9.8 9.8 Z"
-        fill="currentColor"
-      />
-    </svg>
-  )
-}
 
 /* ===================== SMALL FIELD COMPONENTS ===================== */
 
@@ -206,7 +160,6 @@ export function CustomDesigner() {
   const [thread, setThread] = useState(0)
   const [fabric, setFabric] = useState(0)
   const [density, setDensity] = useState<Density>('medium')
-  const [motif, setMotif] = useState<MotifId>('leaf')
   const [size, setSize] = useState<SizeId>('medium')
 
   const threadColor = useMemo(() => threadOptions[thread]?.hex ?? '#b4552f', [thread])
@@ -223,11 +176,10 @@ export function CustomDesigner() {
   const stitchCount = useMemo(() => {
     const densityF = density === 'fine' ? 1.15 : density === 'medium' ? 1 : 0.85
     const sizeF = sizeSpecs[size].factor
-    const motifF = motif === 'none' ? 0 : motif === 'flower' ? 1.18 : 1
     const base = 620 + 210 * (charCount - 1)
-    const total = base * densityF * sizeF * motifF
+    const total = base * densityF * sizeF
     return Math.round(total / 10) * 10
-  }, [density, size, motif, charCount])
+  }, [density, size, charCount])
 
   const surprise = () => {
     setInitials(initialSuggestions[Math.floor(Math.random() * initialSuggestions.length)].toUpperCase())
@@ -235,7 +187,6 @@ export function CustomDesigner() {
     setThread(Math.floor(Math.random() * threadOptions.length))
     setFabric(Math.floor(Math.random() * fabricOptions.length))
     setDensity(densityOptions[Math.floor(Math.random() * densityOptions.length)].value)
-    setMotif(motifOptions[Math.floor(Math.random() * motifOptions.length)].value)
     setSize(sizeOptions[Math.floor(Math.random() * sizeOptions.length)].value)
   }
 
@@ -248,13 +199,12 @@ export function CustomDesigner() {
       `Thread: ${threadOptions[thread]?.name}`,
       `Fabric: ${fabricOptions[fabric]?.name}`,
       `Stitch density: ${densityOptions.find((d) => d.value === density)?.label}`,
-      `Accent: ${motif === 'none' ? 'None' : motifOptions.find((m) => m.value === motif)?.label}`,
       `Hoop size: ${sizeSpecs[size].ring.replace('″ hoop', ' inch')}`,
       `Estimated stitches: ≈ ${stitchCount.toLocaleString()}`,
     ]
     const subject = 'Custom Embroidery Request'
     return `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
-  }, [initials, font, thread, fabric, density, motif, size, stitchCount])
+  }, [initials, font, thread, fabric, density, size, stitchCount])
 
   const summaryChips = [
     initials || 'Initial',
@@ -262,7 +212,6 @@ export function CustomDesigner() {
     threadOptions[thread]?.name ?? '',
     fabricOptions[fabric]?.name ?? '',
     densityOptions.find((d) => d.value === density)?.label ?? '',
-    motif === 'none' ? null : motifOptions.find((m) => m.value === motif)?.label ?? null,
   ].filter(Boolean)
 
   return (
@@ -325,13 +274,6 @@ export function CustomDesigner() {
                   {initials || 'A'}
                 </span>
               </div>
-              {/* Motif */}
-              {motif !== 'none' && (
-                <MotifGlyph
-                  id={motif}
-                  className="absolute bottom-[16%] right-[22%] w-7 rotate-12 transition-colors duration-500"
-                />
-              )}
             </div>
           </div>
 
@@ -366,22 +308,6 @@ export function CustomDesigner() {
 
           <Field label="Stitch density">
             <SegmentGroup options={densityOptions} value={density} onChange={setDensity} />
-          </Field>
-
-          <Field label="Accent">
-            <SegmentGroup
-              options={motifOptions}
-              value={motif}
-              onChange={setMotif}
-              renderLabel={(opt) => (
-                <>
-                  {opt.value !== 'none' && (
-                    <MotifGlyph id={opt.value} className="h-3 w-3" />
-                  )}
-                  {opt.label}
-                </>
-              )}
-            />
           </Field>
 
           <Field label="Hoop size">
