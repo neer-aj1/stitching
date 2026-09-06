@@ -197,18 +197,18 @@ export const categories: Category[] = [
 export const testimonials: Testimonial[] = [
     {
         quote: "The detailing was even more beautiful in person. You can actually see the care that went into every stitch.",
-        name: "Amelia",
-        location: "Portland, OR",
+        name: "Manish",
+        location: "",
     },
     {
         quote: "I asked for my grandmother’s initials on a handkerchief. It arrived feeling like something she would have treasured.",
-        name: "Daniel",
-        location: "Brooklyn, NY",
+        name: "Ankush",
+        location: "",
     },
     {
         quote: "It’s not just a shirt — it’s a tiny piece of art that happens to be wearable. I get asked about it constantly.",
         name: "Priya",
-        location: "Austin, TX",
+        location: "",
     },
 ];
 

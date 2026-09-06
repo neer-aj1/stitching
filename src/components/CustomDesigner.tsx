@@ -70,7 +70,7 @@ const sizeSpecs: Record<SizeId, { ring: string; factor: number; px: number }> = 
   large: { ring: '5″ hoop', factor: 1.3, px: 168 },
 }
 
-const initialSuggestions = ['A', 'AM', 'EL', 'RS']
+const initialSuggestions = ['A', 'AM', 'EL', 'RS', 'Bloom', 'Cozy', 'Stitch']
 
 /* ============================ GLYPHS ============================ */
 
@@ -217,7 +217,8 @@ export function CustomDesigner() {
     density === 'fine' ? 'font-light' : density === 'medium' ? 'font-normal' : 'font-semibold'
 
   const charCount = Math.max(initials.length, 1)
-  const letterPx = Math.round(sizeSpecs[size].px * (charCount === 1 ? 1 : charCount === 2 ? 0.7 : charCount === 3 ? 0.58 : 0.5))
+  const sizeScale = charCount <= 1 ? 1 : charCount <= 2 ? 0.7 : charCount <= 3 ? 0.58 : charCount <= 4 ? 0.5 : charCount <= 5 ? 0.42 : charCount <= 6 ? 0.36 : 0.31
+  const letterPx = Math.round(sizeSpecs[size].px * sizeScale)
 
   const stitchCount = useMemo(() => {
     const densityF = density === 'fine' ? 1.15 : density === 'medium' ? 1 : 0.85
@@ -229,7 +230,7 @@ export function CustomDesigner() {
   }, [density, size, motif, charCount])
 
   const surprise = () => {
-    setInitials(initialSuggestions[Math.floor(Math.random() * initialSuggestions.length)])
+    setInitials(initialSuggestions[Math.floor(Math.random() * initialSuggestions.length)].toUpperCase())
     setFont(fontOptions[Math.floor(Math.random() * fontOptions.length)].value)
     setThread(Math.floor(Math.random() * threadOptions.length))
     setFabric(Math.floor(Math.random() * fabricOptions.length))
@@ -316,7 +317,7 @@ export function CustomDesigner() {
                   style={{
                     fontSize: `${letterPx}px`,
                     color: threadColor,
-                    letterSpacing: font === 'modern' ? '0.04em' : '0.01em',
+                    letterSpacing: charCount <= 4 ? (font === 'modern' ? '0.04em' : '0.01em') : charCount <= 6 ? '0' : '-0.02em',
                     textShadow: '0 1px 0 rgba(0,0,0,0.18), 0 0 22px rgba(0,0,0,0.12)',
                     transition: 'color 0.4s ease',
                   }}
@@ -345,14 +346,14 @@ export function CustomDesigner() {
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                maxLength={4}
+                maxLength={7}
                 value={initials}
                 onChange={(e) => setInitials(e.target.value.toUpperCase().replace(/\s/g, ''))}
                 placeholder="A"
                 aria-label="Your initials or name"
                 className="w-24 rounded-sm border-b-2 border-charcoal/25 bg-transparent py-1 font-serif text-2xl tracking-[0.15em] text-charcoal outline-none transition-colors focus:border-terracotta"
               />
-              <span className="text-xs text-charcoal-soft">Up to 4 letters</span>
+              <span className="text-xs text-charcoal-soft">Up to 7 letters</span>
             </div>
           </Field>
 
