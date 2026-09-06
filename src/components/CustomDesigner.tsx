@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { PointerEvent, ReactNode } from 'react'
 import html2canvas from 'html2canvas'
 import { Button } from './Button'
@@ -649,18 +650,20 @@ export function CustomDesigner() {
         </p>
       </div>
 
-      {/* Drag ghost */}
-      {drag && (
-        <div
-          className="pointer-events-none fixed left-0 top-0 z-50 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: drag.x, top: drag.y }}
-          aria-hidden="true"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10">
-            <DecorGlyph id={drag.source.type} className="h-7 w-7" strokeWidth={1.8} />
-          </div>
-        </div>
-      )}
+      {/* Drag ghost (portaled to body so no transformed ancestor shifts it) */}
+      {drag &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed left-0 top-0 z-50 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: drag.x, top: drag.y }}
+            aria-hidden="true"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10">
+              <DecorGlyph id={drag.source.type} className="h-7 w-7" strokeWidth={1.8} />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
