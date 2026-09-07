@@ -90,7 +90,7 @@ export const projects: Project[] = [
         description:
             "A single stem of wildflowers traced across organic cotton.",
         category: "T-Shirts",
-        src: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?q=80&w=900&auto=format&fit=crop",
+        src: "/images/tshirt3.jpg",
         span: "standard",
     },
     {
@@ -98,7 +98,7 @@ export const projects: Project[] = [
         name: "Floral Threadwork",
         description: "Layered petals and thread in muted terracotta and sage.",
         category: "Fabric Art",
-        src: "https://images.unsplash.com/photo-1527016021513-b09758b777bd?q=80&w=900&auto=format&fit=crop",
+        src: "/images/tshirt4.jpg",
         span: "tall",
     },
     {
@@ -171,7 +171,7 @@ export const categories: Category[] = [
     {
         name: "T-Shirts",
         description: "Wearable embroidery on organic cotton, one of a kind.",
-        src: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=700&auto=format&fit=crop",
+        src: "/images/tshirt5.jpg",
     },
     {
         name: "Custom Embroidery",
