@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PointerEvent, ReactNode } from 'react'
-import html2canvas from 'html2canvas'
+import { toPng } from 'html-to-image'
 import { Button } from './Button'
 import { contactEmail } from '../data/site'
 
@@ -369,16 +369,18 @@ export function CustomDesigner() {
     if (!el || isCapturing) return
     setIsCapturing(true)
     try {
-      const canvas = await html2canvas(el, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        cacheBust: true,
       })
       const link = document.createElement('a')
       link.download = 'threadwork-preview.png'
-      link.href = canvas.toDataURL('image/png')
+      link.href = dataUrl
+      document.body.appendChild(link)
       link.click()
+      link.remove()
+    } catch (err) {
+      console.error('Failed to capture preview:', err)
     } finally {
       setIsCapturing(false)
     }
